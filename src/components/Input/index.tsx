@@ -11,7 +11,7 @@ export type InputProps<T> = Omit<
 
 const Input = function <T extends number | string>({
   name,
-  value: passedValue,
+  value,
   onChange,
   ...nativeProps
 }: InputProps<T>) {
@@ -32,7 +32,7 @@ const Input = function <T extends number | string>({
     <input
       className={styles.input}
       name={name}
-      value={passedValue}
+      value={value}
       {...nativeProps}
       onChange={changeHandler}
     />

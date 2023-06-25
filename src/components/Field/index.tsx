@@ -3,7 +3,7 @@ import styles from "./styles.module.scss";
 
 export type FieldProps = {
   name: string;
-  label: string;
+  label?: string;
   errors?: string[];
   children: React.ReactNode;
 };
