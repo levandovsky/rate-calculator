@@ -1,7 +1,7 @@
 import styles from "./styles.module.scss";
 import { InputHTMLAttributes, ReactNode } from "react";
 
-export type SelectProps<T> = Omit<
+export type SelectProps<T extends string> = Omit<
   InputHTMLAttributes<HTMLSelectElement>,
   "value" | "onChange"
 > & {
@@ -11,30 +11,20 @@ export type SelectProps<T> = Omit<
   onChange: (value: T) => void;
 };
 
-const Select = function <T extends number | string>({
+const Select = function <T extends string>({
   options,
   value,
   onChange,
   formatOption,
   ...nativeProps
 }: SelectProps<T>) {
-  const valueType = () => {
-    if (value) return typeof value;
-
-    return typeof options[0];
-  };
-
   return (
     <select
-      value={value === undefined ? "" : value}
+      value={value}
       className={styles.select}
       {...nativeProps}
       onChange={(e) => {
         const value = e.target.value;
-
-        if (valueType() === "number") {
-          return onChange(Number(value) as T);
-        }
 
         onChange(value as T);
       }}
