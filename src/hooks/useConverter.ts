@@ -43,15 +43,22 @@ export const useConverter = () => {
       try {
         const response = await fetch(url);
         const converterData = (await response.json()) as ConverterData;
+
         setState({
           converterData,
+          isLoading: false,
         });
+
+        return converterData;
       } catch (e) {
         const error = e as Error;
-        console.error(error);
+
         setState({
           error: error.message,
+          isLoading: false,
         });
+
+        return error;
       }
     },
     [setState]
