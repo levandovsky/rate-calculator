@@ -1,4 +1,4 @@
-import "./styles.css";
+import styles from "./styles.module.scss";
 import { InputHTMLAttributes, ReactNode } from "react";
 
 export type SelectProps<T> = Omit<
@@ -27,7 +27,7 @@ const Select = function <T extends number | string>({
   return (
     <select
       value={value === undefined ? "" : value}
-      className="select"
+      className={styles.select}
       {...nativeProps}
       onChange={(e) => {
         const value = e.target.value;
@@ -39,9 +39,6 @@ const Select = function <T extends number | string>({
         onChange(value as T);
       }}
     >
-      <option value="" disabled>
-        Select
-      </option>
       {options.map((option) => {
         return (
           <option value={option} key={option}>

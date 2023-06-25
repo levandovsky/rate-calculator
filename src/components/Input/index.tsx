@@ -1,6 +1,5 @@
-import "./styles.css";
+import styles from "./styles.module.scss";
 import { InputHTMLAttributes } from "react";
-import Field, { FieldProps } from "../Field";
 
 export type InputProps<T> = Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -12,47 +11,31 @@ export type InputProps<T> = Omit<
 
 const Input = function <T extends number | string>({
   name,
-  value,
+  value: passedValue,
   onChange,
   ...nativeProps
 }: InputProps<T>) {
-  const valueType = () => {
-    if (value) return typeof value;
+  const changeHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
 
-    return typeof value;
+    if (!onChange) return;
+
+    if (nativeProps.type === "number") {
+      onChange(Number(inputValue) as T);
+      return;
+    }
+
+    onChange(inputValue as T);
   };
 
   return (
     <input
-      className="input"
+      className={styles.input}
       name={name}
-      type={valueType()}
-      value={value}
+      value={passedValue}
       {...nativeProps}
-      onChange={(e) => {
-        const value = e.target.value;
-
-        if (!onChange) return;
-
-        if (valueType() === "number") {
-          return onChange(Number(value) as T);
-        }
-
-        onChange(value as T);
-      }}
+      onChange={changeHandler}
     />
-  );
-};
-
-export const InputField = function <T extends number | string>({
-  name,
-  label,
-  ...otherProps
-}: InputProps<T> & Omit<FieldProps, "children">) {
-  return (
-    <Field name={name} label={label}>
-      <Input name={name} {...otherProps} />
-    </Field>
   );
 };
 

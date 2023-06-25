@@ -1,87 +1,161 @@
-import "./App.css";
+import styles from "./App.module.scss";
 import Select from "./components/Select";
 import { useMergeState } from "./hooks/useMergeState";
 import { CURRENCIES, Currency } from "./currencies";
 import Field from "./components/Field";
-import { ConverterParams, useConverter } from "./hooks/useConverter";
+import {
+  ConverterData,
+  ConverterParams,
+  useConverter,
+} from "./hooks/useConverter";
 import Input from "./components/Input";
-import { useState } from "react";
 import { classnames } from "./utils/classnames";
 import SvgReverseIcon from "./assets/reverse.svg";
-
-type State = Partial<ConverterParams> & { amount: number };
+import { shallowEqual } from "./utils/compareObject";
+import { useDebounce } from "./hooks/useDebounce";
 
 const currencyList = Object.keys(CURRENCIES) as Currency[];
 
-const canCalculate = (state: State): state is ConverterParams => {
-  return !!state.from && !!state.to && state.amount > 0;
-};
-
 const optionFormat = (option: Currency) => `${CURRENCIES[option]} ${option}`;
 
+type State = {
+  firstCalculated: boolean;
+  convertedTo?: number;
+  converterData?: ConverterData;
+};
+
+type UpdateConverterParams = {
+  update: Partial<ConverterParams>;
+  debounce?: boolean;
+};
+
 function App() {
-  const [calculated, setCalculated] = useState(false);
   const [state, setState] = useMergeState<State>({
-    from: undefined,
-    to: undefined,
-    amount: 0,
+    firstCalculated: false,
   });
 
-  const { converterData, calculateRates, isLoading, error } = useConverter();
+  const [params, setParams] = useMergeState<ConverterParams>({
+    from: "EUR",
+    to: "GBP",
+    amount: 1,
+  });
+
+  const amountValid = params.amount > 0;
+  const convertedToValid =
+    state.convertedTo === undefined || state.convertedTo > 0;
+
+  const { calculateRates, isLoading } = useConverter();
+
+  const debouncedCalculateRates = useDebounce(calculateRates, 500);
 
   const currenciesFrom = currencyList.filter(
-    (currency) => currency !== state.to
+    (currency) => currency !== params.to
   );
 
   const currenciesTo = currencyList.filter(
-    (currency) => currency !== state.from
+    (currency) => currency !== params.from
   );
 
-  const updateConverterData = async (update: Partial<State>) => {
-    const newState: State = { ...state, ...update };
-    setState(newState);
+  const updateConverterData = async ({
+    update,
+    debounce = false,
+  }: UpdateConverterParams) => {
+    const newParams: ConverterParams = {
+      ...params,
+      ...update,
+    };
 
-    if (canCalculate(newState) && calculated) {
-      await calculateRates(newState);
-    }
+    const isEqual = shallowEqual(params, newParams);
+
+    if (isEqual) return;
+
+    setParams(newParams);
+
+    if (!state.firstCalculated || newParams.amount <= 0) return;
+
+    const handler = debounce ? debouncedCalculateRates : calculateRates;
+
+    const result = await handler(newParams);
+
+    if (result instanceof Error) return;
+
+    setState({
+      convertedTo: result.toAmount,
+      converterData: result,
+    });
+  };
+
+  const updateConvertedTo = async (value: number) => {
+    if (value === state.convertedTo) return;
+
+    const newParams: ConverterParams = {
+      from: params.to,
+      to: params.from,
+      amount: value,
+    };
+
+    setState({
+      convertedTo: value,
+    });
+
+    if (value <= 0) return;
+
+    const result = await debouncedCalculateRates(newParams);
+
+    if (result instanceof Error) return;
+
+    setParams({
+      amount: result.toAmount,
+    });
   };
 
   return (
-    <main className="app">
+    <main className={styles.app}>
       <form
-        className="calculator"
-        onSubmit={(e) => {
+        className={styles.calculator}
+        onSubmit={async (e) => {
           e.preventDefault();
 
-          setCalculated(true);
+          if (!amountValid) return;
 
-          if (canCalculate(state)) {
-            calculateRates(state);
-          }
+          const result = await calculateRates(params);
+
+          if (result instanceof Error) return;
+
+          setState({
+            convertedTo: result.toAmount,
+            converterData: result,
+            firstCalculated: true,
+          });
         }}
       >
-        <div className="currencies">
+        <div className={styles.currencies}>
           <Field name="from" label="FROM">
             <Select
               name="from"
-              value={state.from}
+              value={params.from}
               options={currenciesFrom}
               onChange={(value) => {
                 updateConverterData({
-                  from: value,
+                  update: {
+                    from: value,
+                  },
                 });
               }}
               formatOption={optionFormat}
+              disabled={isLoading}
             />
           </Field>
           <button
             type="button"
-            className="reverse-button"
-            disabled={!state.to || !state.from}
+            className={styles.reverseButton}
+            disabled={!params.to || !params.from || isLoading}
             onClick={() => {
               updateConverterData({
-                from: state.to,
-                to: state.from,
+                update: {
+                  from: params.to,
+                  to: params.from,
+                },
               });
             }}
           >
@@ -90,52 +164,74 @@ function App() {
           <Field name="to" label="TO">
             <Select
               name="to"
-              value={state.to}
+              value={params.to}
               options={currenciesTo}
               onChange={(value) => {
                 updateConverterData({
-                  to: value,
+                  update: {
+                    to: value,
+                  },
                 });
               }}
               formatOption={optionFormat}
+              disabled={isLoading}
             />
           </Field>
         </div>
-        <div className="amount-container">
-          <Field name="amount" label="AMOUNT">
+        <div className={styles.amountContainer}>
+          <Field
+            name="amount"
+            label="AMOUNT"
+            errors={!amountValid ? ["Amount should be greater than 0"] : []}
+          >
             <Input
               name="amount"
-              value={state.amount}
+              type="number"
+              value={params.amount}
               onChange={(value) => {
                 updateConverterData({
-                  amount: value,
+                  update: {
+                    amount: value,
+                  },
+                  debounce: true,
                 });
               }}
             />
           </Field>
-          {converterData && (
-            <Field name="converted" label="CONVERTED TO">
-              <Input name="converted" value={converterData.toAmount} readOnly />
+          {state.convertedTo !== undefined && (
+            <Field
+              name="converted"
+              label="CONVERTED TO"
+              errors={
+                !convertedToValid ? ["Amount should be greater than 0"] : []
+              }
+            >
+              <Input
+                name="converted"
+                type="number"
+                value={state.convertedTo || 0}
+                onChange={updateConvertedTo}
+              />
             </Field>
           )}
         </div>
-        {converterData && (
-          <div className="rate">
-            <div>
-              1 {state.from} = {converterData.rate} {state.to}
+        {state.converterData && (
+          <div className={styles.rateContainer}>
+            <div className={styles.rate}>
+              1 {params.from} = {state.converterData.rate} {params.to}
             </div>
-            <div>
+            <p className={styles.info}>
               All figures are live mid-market rates, which are for informational
               purposes only. To see the rates we quote for money transfer,
               please select Live Money Transfer Rates.
-            </div>
+            </p>
           </div>
         )}
-        {!calculated && (
+        {!state.firstCalculated && (
           <button
-            disabled={!canCalculate(state)}
-            className={classnames("button", {
-              "button-loading": isLoading,
+            disabled={!amountValid}
+            className={classnames(styles.convertButton, {
+              [styles.loading]: isLoading,
             })}
             type="submit"
           >
