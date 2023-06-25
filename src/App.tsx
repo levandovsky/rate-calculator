@@ -44,7 +44,7 @@ function App() {
   const convertedToValid =
     state.convertedTo === undefined || state.convertedTo > 0;
 
-  const { calculateRates, isLoading } = useConverter();
+  const { calculateRates, isLoading, error } = useConverter();
 
   const debouncedCalculateRates = useDebounce(calculateRates, 500);
 
@@ -238,6 +238,7 @@ function App() {
             Convert
           </button>
         )}
+        {error && <div className={styles.error}>{error}</div>}
       </form>
     </main>
   );
